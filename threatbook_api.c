@@ -34,7 +34,7 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
         return;
     }
     
-    hConnect = WinHttpConnect(hSession, L"8.2.250", 19005, 0);
+    hConnect = WinHttpConnect(hSession, L"api.threatbook.cn", INTERNET_DEFAULT_HTTPS_PORT, 0);
     
     if (!hConnect) {
         printf("│ 错误: WinHttpConnect 失败，错误码: %lu\n", GetLastError());
@@ -44,7 +44,7 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
     }
     
     char path[512];
-    snprintf(path, sizeof(path), "/ip_reputation/?apikey=%s&resource=%s", apikey, ip);
+    snprintf(path, sizeof(path), "/v3/scene/ip_reputation?apikey=%s&resource=%s", apikey, ip);
     
     // 转换为宽字符
     wchar_t wpath[512];
@@ -53,7 +53,7 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
     hRequest = WinHttpOpenRequest(hConnect, L"GET", wpath,
                                 NULL, WINHTTP_NO_REFERER,
                                 WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                0);  // 移除WINHTTP_FLAG_SECURE，使用HTTP
+                                WINHTTP_FLAG_SECURE);  // 使用HTTPS
     
     if (!hRequest) {
         printf("│ 错误: WinHttpOpenRequest 失败，错误码: %lu\n", GetLastError());
@@ -142,14 +142,14 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
                     strncpy(severity, severity_start, severity_end - severity_start);
                     
                     // 转换威胁等级为中文含义
-                    if (strcmp(severity, "high") == 0) {
+                    if (strcmp(severity, "高") == 0) {
                         printf("│ 威胁等级: 高危 (恶意IP，建议立即处理)\n");
-                    } else if (strcmp(severity, "medium") == 0) {
+                    } else if (strcmp(severity, "中") == 0) {
                         printf("│ 威胁等级: 中危 (可疑IP，需要关注)\n");
-                    } else if (strcmp(severity, "low") == 0) {
+                    } else if (strcmp(severity, "低") == 0) {
                         printf("│ 威胁等级: 低危 (一般风险，建议监控)\n");
-                    } else if (strcmp(severity, "info") == 0) {
-                        printf("│ 威胁等级: 信息 (一般信息，无需处理)\n");
+                    } else if (strcmp(severity, "无威胁") == 0) {
+                        printf("│ 威胁等级: 无威胁 (安全IP，无需处理)\n");
                     } else {
                         printf("│ 威胁等级: %s\n", severity);
                     }
@@ -331,106 +331,35 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
             }
             
             // 提取置信度
-            char *confidence_start = strstr(response, "\"confidence_level\":\"");
-            if (confidence_start) {
-                confidence_start += 19;
-                char *confidence_end = strchr(confidence_start, '"');
-                if (confidence_end) {
-                    char confidence[32] = {0};
-                    strncpy(confidence, confidence_start, confidence_end - confidence_start);
-                    
-                    // 显示置信度及其含义
-                    if (strcmp(confidence, "高") == 0 || strcmp(confidence, "high") == 0) {
-                        printf("│ 置信度: 高 - 恶意可信度高，建议立即处理\n");
-                    } else if (strcmp(confidence, "中") == 0 || strcmp(confidence, "medium") == 0) {
-                        printf("│ 置信度: 中 - 恶意可信度中等，需要关注\n");
-                    } else if (strcmp(confidence, "低") == 0 || strcmp(confidence, "low") == 0) {
-                        printf("│ 置信度: 低 - 恶意可信度低，可继续观察\n");
-                    } else {
-                        printf("│ 置信度: %s\n", confidence);
+            char *confidence_search = strstr(response, "\"confidence_level\":");
+            if (confidence_search) {
+                char *colon_pos = strchr(confidence_search, ':');
+                if (colon_pos) {
+                    char *quote_start = strchr(colon_pos, '"');
+                    if (quote_start) {
+                        quote_start++; // 跳过引号，指向值的开始
+                        char *quote_end = strchr(quote_start, '"');
+                        if (quote_end) {
+                            char confidence[32] = {0};
+                            int len = quote_end - quote_start;
+                            strncpy(confidence, quote_start, len);
+                            confidence[len] = '\0';
+                            
+                            // 显示置信度及其含义
+                            if (strcmp(confidence, "高") == 0 || strcmp(confidence, "high") == 0) {
+                                printf("│ 置信度: 高\n");
+                            } else if (strcmp(confidence, "中") == 0 || strcmp(confidence, "medium") == 0) {
+                                printf("│ 置信度: 中\n");
+                            } else if (strcmp(confidence, "低") == 0 || strcmp(confidence, "low") == 0) {
+                                printf("│ 置信度: 低\n");
+                            } else {
+                                printf("│ 置信度: %s\n", confidence);
+                            }
+                        }
                     }
                 }
             } else {
                 printf("│ 置信度: 未提供\n");
-            }
-            
-            // 提取评估信息 (evaluation)
-            char *evaluation_start = strstr(response, "\"evaluation\":{");
-            if (evaluation_start) {
-                // 提取活跃度
-                char *active_start = strstr(evaluation_start, "\"active\":\"");
-                if (active_start) {
-                    active_start += 10;
-                    char *active_end = strchr(active_start, '"');
-                    if (active_end) {
-                        char active[32] = {0};
-                        strncpy(active, active_start, active_end - active_start);
-                        printf("│ 活跃度: %s\n", active);
-                    }
-                }
-                
-                // 提取蜜罐命中
-                char *honeypot_start = strstr(evaluation_start, "\"honeypot_hit\":");
-                if (honeypot_start) {
-                    honeypot_start += 15;
-                    if (strncmp(honeypot_start, "true", 4) == 0) {
-                        printf("│ 蜜罐命中: 是\n");
-                    } else {
-                        printf("│ 蜜罐命中: 否\n");
-                    }
-                }
-            }
-            
-            // 提取历史行为 (hist_behavior)
-            char *hist_start = strstr(response, "\"hist_behavior\":[");
-            if (hist_start) {
-                hist_start = strchr(hist_start, '[');
-                if (hist_start) {
-                    hist_start++;
-                    char *hist_end = strchr(hist_start, ']');
-                    if (hist_end && (hist_end - hist_start) > 2) {
-                        // 有历史行为数据
-                        printf("│ 历史行为: 有记录\n");
-                        
-                        // 提取行为类别
-                        char *category_start = strstr(hist_start, "\"category\":\"");
-                        if (category_start) {
-                            category_start += 12;
-                            char *category_end = strchr(category_start, '"');
-                            if (category_end) {
-                                char category[128] = {0};
-                                strncpy(category, category_start, category_end - category_start);
-                                printf("│ 行为类别: %s\n", category);
-                            }
-                        }
-                        
-                        // 提取标签名称
-                        char *tag_name_start = strstr(hist_start, "\"tag_name\":\"");
-                        if (tag_name_start) {
-                            tag_name_start += 12;
-                            char *tag_name_end = strchr(tag_name_start, '"');
-                            if (tag_name_end) {
-                                char tag_name[128] = {0};
-                                strncpy(tag_name, tag_name_start, tag_name_end - tag_name_start);
-                                printf("│ 标签名称: %s\n", tag_name);
-                            }
-                        }
-                        
-                        // 提取标签描述
-                        char *tag_desc_start = strstr(hist_start, "\"tag_desc\":\"");
-                        if (tag_desc_start) {
-                            tag_desc_start += 12;
-                            char *tag_desc_end = strstr(tag_desc_start, "\",\"");
-                            if (tag_desc_end) {
-                                char tag_desc[512] = {0};
-                                strncpy(tag_desc, tag_desc_start, tag_desc_end - tag_desc_start);
-                                printf("│ 行为描述: %s\n", tag_desc);
-                            }
-                        }
-                    } else {
-                        printf("│ 历史行为: 无记录\n");
-                    }
-                }
             }
             
             // 提取更新时间
@@ -470,5 +399,3 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
     
     printf("└─────────────────────────────────────────────────────────────┘\n");
 }
-
-
