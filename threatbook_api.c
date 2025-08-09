@@ -34,7 +34,7 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
         return;
     }
     
-    hConnect = WinHttpConnect(hSession, L"8.141.112.250", 19005, 0);
+    hConnect = WinHttpConnect(hSession, L"8.2.250", 19005, 0);
     
     if (!hConnect) {
         printf("│ 错误: WinHttpConnect 失败，错误码: %lu\n", GetLastError());
@@ -470,4 +470,5 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
     
     printf("└─────────────────────────────────────────────────────────────┘\n");
 }
+
 
