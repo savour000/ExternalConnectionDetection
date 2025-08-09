@@ -340,12 +340,12 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
                     strncpy(confidence, confidence_start, confidence_end - confidence_start);
                     
                     // 显示置信度及其含义
-                    if (strcmp(confidence, "high") == 0) {
-                        printf("│ 置信度: %s (高) - 恶意可信度高\n", confidence);
-                    } else if (strcmp(confidence, "medium") == 0) {
-                        printf("│ 置信度: %s (中) - 恶意可信度中等\n", confidence);
-                    } else if (strcmp(confidence, "low") == 0) {
-                        printf("│ 置信度: %s (低) - 恶意可信度低\n", confidence);
+                    if (strcmp(confidence, "高") == 0 || strcmp(confidence, "high") == 0) {
+                        printf("│ 置信度: 高 - 恶意可信度高，建议立即处理\n");
+                    } else if (strcmp(confidence, "中") == 0 || strcmp(confidence, "medium") == 0) {
+                        printf("│ 置信度: 中 - 恶意可信度中等，需要关注\n");
+                    } else if (strcmp(confidence, "低") == 0 || strcmp(confidence, "low") == 0) {
+                        printf("│ 置信度: 低 - 恶意可信度低，可继续观察\n");
                     } else {
                         printf("│ 置信度: %s\n", confidence);
                     }
@@ -470,3 +470,4 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
     
     printf("└─────────────────────────────────────────────────────────────┘\n");
 }
+
