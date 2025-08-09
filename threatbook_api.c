@@ -338,8 +338,20 @@ void query_threatbook_winhttp(const char *ip, const char *apikey) {
                 if (confidence_end) {
                     char confidence[32] = {0};
                     strncpy(confidence, confidence_start, confidence_end - confidence_start);
-                    printf("│ 置信度: %s\n", confidence);
+                    
+                    // 显示置信度及其含义
+                    if (strcmp(confidence, "high") == 0) {
+                        printf("│ 置信度: %s (高) - 恶意可信度高\n", confidence);
+                    } else if (strcmp(confidence, "medium") == 0) {
+                        printf("│ 置信度: %s (中) - 恶意可信度中等\n", confidence);
+                    } else if (strcmp(confidence, "low") == 0) {
+                        printf("│ 置信度: %s (低) - 恶意可信度低\n", confidence);
+                    } else {
+                        printf("│ 置信度: %s\n", confidence);
+                    }
                 }
+            } else {
+                printf("│ 置信度: 未提供\n");
             }
             
             // 提取评估信息 (evaluation)
